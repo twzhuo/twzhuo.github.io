@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTA酒店客房信息录入系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .room-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .input-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        .input-group input, .input-group textarea, .input-group select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-group input:focus, .input-group textarea:focus, .input-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem 0.625rem;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            margin: 0.125rem;
+        }
+        .star { color: #f59e0b; }
+        .preview-scroll::-webkit-scrollbar { width: 6px; }
+        .preview-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        /* 轮播图样式 */
+        .carousel {
+            position: relative;
+            overflow: hidden;
+        }
+        .carousel-inner {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+        }
+        .carousel-item {
+            min-width: 100%;
+        }
+        .carousel-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.4);
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 10;
+        }
+        .carousel-btn:hover {
+            background: rgba(0,0,0,0.6);
+        }
+        .carousel-btn.prev { left: 10px; }
+        .carousel-btn.next { right: 10px; }
+        .carousel-dots {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 10;
+        }
+        .carousel-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .carousel-dot.active {
+            background: white;
+            width: 20px;
+            border-radius: 4px;
+        }
+        /* 原价划线 */
+        .original-price {
+            text-decoration: line-through;
+            color: #9ca3af;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 顶部操作栏 -->
+    <header class="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div class="max-w-[1800px] mx-auto px-6 py-3 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-gray-800">🏨 OTA 酒店客房信息录入系统</h1>
+            <div class="flex gap-3">
+                <button onclick="addRoom()" class="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-sm font-medium">
+                    ➕ 添加房型
+                </button>
+                <button onclick="exportGuestPage()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                    📤 导出客人端网页
+                </button>
+                <button onclick="resetAll()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-medium">
+                    🔄 重置
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-[1800px] mx-auto p-6 flex gap-6">
+        <!-- 左侧：录入表单 -->
+        <div class="w-1/2 space-y-6">
+            <!-- 酒店基本信息 -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">📋 酒店基本信息</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label>酒店名称</label>
+                        <input type="text" id="hotelName" placeholder="例如：广州珠江新城希尔顿酒店" value="">
+                    </div>
+                    <div class="input-group">
+                        <label>酒店星级</label>
+                        <select id="hotelStar">
+                            <option value="2">二星级</option>
+                            <option value="3">三星级</option>
+                            <option value="4">四星级</option>
+                            <option value="5" selected>五星级</option>
+                        </select>
+                    </div>
+                    <div class="input-group col-span-2">
+                        <label>酒店地址</label>
+                        <input type="text" id="hotelAddress" placeholder="详细地址" value="">
+                    </div>
+                    <div class="input-group">
+                        <label>评分</label>
+                        <input type="number" id="hotelScore" step="0.1" min="0" max="5" value="">
+                    </div>
+                    <div class="input-group">
+                        <label>评论数</label>
+                        <input type="number" id="hotelReviews" value="">
+                    </div>
+                    <div class="input-group col-span-2">
+                        <label>酒店封面图1 URL</label>
+                        <input type="text" id="hotelCover1" placeholder="主图链接" value="">
+                    </div>
+                    <div class="input-group col-span-2">
+                        <label>酒店封面图2 URL</label>
+                        <input type="text" id="hotelCover2" placeholder="第二张图链接" value="">
+                    </div>
+                    <div class="input-group col-span-2">
+                        <label>酒店简介</label>
+                        <textarea id="hotelDesc" rows="3" placeholder="酒店介绍" value=""></textarea>
+                    </div>
+                    <div class="input-group col-span-2">
+                        <label>酒店设施（逗号分隔）</label>
+                        <input type="text" id="hotelFacilities" placeholder="例如：免费WiFi,游泳池,健身房" value="">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 房型列表 -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">🛏️ 房型管理</h2>
+                <div id="roomList" class="space-y-4">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：实时预览 -->
+        <div class="w-1/2">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden sticky top-20">
+                <div class="bg-gray-50 px-4 py-2 border-b flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-600">👁️ 客人端实时预览</span>
+                    <span class="text-xs text-gray-400">手机端效果</span>
+                </div>
+                <div id="previewArea" class="preview-scroll h-[calc(100vh-180px)] overflow-y-auto bg-gray-50">
+                    <!-- 预览内容 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let roomIdCounter = 0;
+        let rooms = [];
+        let currentSlide = 0;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 默认添加一个空白房型
+            addRoom();
+            
+            // 绑定所有输入事件
+            bindInputEvents();
+            updatePreview();
+        });
+
+        function bindInputEvents() {
+            const inputs = document.querySelectorAll('#hotelName, #hotelStar, #hotelAddress, #hotelScore, #hotelReviews, #hotelCover1, #hotelCover2, #hotelDesc, #hotelFacilities');
+            inputs.forEach(input => {
+                input.addEventListener('input', updatePreview);
+                input.addEventListener('change', updatePreview);
+            });
+        }
+
+        function addRoom(name = '', price = '', originalPrice = '', size = '', image = '', facilities = []) {
+            const id = roomIdCounter++;
+            const room = { id, name, price, originalPrice, size, image, facilities };
+            rooms.push(room);
+            renderRoomList();
+            updatePreview();
+        }
+
+        function removeRoom(id) {
+            rooms = rooms.filter(r => r.id !== id);
+            renderRoomList();
+            updatePreview();
+        }
+
+        function renderRoomList() {
+            const container = document.getElementById('roomList');
+            container.innerHTML = rooms.map(room => `
+                <div class="border rounded-lg p-4 bg-gray-50 room-item fade-in" data-id="${room.id}">
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="font-medium text-gray-800">房型 #${room.id + 1}</h3>
+                        <button onclick="removeRoom(${room.id})" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="input-group col-span-2">
+                            <label>房型名称</label>
+                            <input type="text" class="room-name" value="${room.name}" oninput="updateRoomData(${room.id}, 'name', this.value); updatePreview()">
+                        </div>
+                        <div class="input-group">
+                            <label>折扣价（元/晚）</label>
+                            <input type="number" class="room-price" value="${room.price}" oninput="updateRoomData(${room.id}, 'price', this.value); updatePreview()">
+                        </div>
+                        <div class="input-group">
+                            <label>原价（元/晚）</label>
+                            <input type="number" class="room-original-price" value="${room.originalPrice}" oninput="updateRoomData(${room.id}, 'originalPrice', this.value); updatePreview()">
+                        </div>
+                        <div class="input-group col-span-2">
+                            <label>面积/床型</label>
+                            <input type="text" class="room-size" placeholder="例如：一张2.0米大床 | 可住2人 | 45㎡" value="${room.size}" oninput="updateRoomData(${room.id}, 'size', this.value); updatePreview()">
+                        </div>
+                        <div class="input-group col-span-2">
+                            <label>房型图片URL</label>
+                            <input type="text" class="room-image" placeholder="房型图片链接" value="${room.image}" oninput="updateRoomData(${room.id}, 'image', this.value); updatePreview()">
+                        </div>
+                        <div class="input-group col-span-2">
+                            <label>房间设施（逗号分隔）</label>
+                            <input type="text" class="room-facilities" placeholder="例如：免费WiFi,空调,迷你吧" value="${room.facilities.join(',')}" oninput="updateRoomData(${room.id}, 'facilities', this.value.split(',')); updatePreview()">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateRoomData(id, field, value) {
+            const room = rooms.find(r => r.id === id);
+            if (room) {
+                if (field === 'facilities') {
+                    room[field] = Array.isArray(value) ? value : [value];
+                } else {
+                    room[field] = value;
+                }
+            }
+        }
+
+        function getStarHtml(count) {
+            return '★'.repeat(count) + '☆'.repeat(5 - count);
+        }
+
+        // 计算折扣
+        function getDiscount(original, current) {
+            if (!original || !current || original <= current) return null;
+            const discount = (current / original * 10).toFixed(1);
+            return discount;
+        }
+
+        function updatePreview() {
+            const name = document.getElementById('hotelName').value || '酒店名称';
+            const star = parseInt(document.getElementById('hotelStar').value);
+            const address = document.getElementById('hotelAddress').value || '酒店地址';
+            const score = document.getElementById('hotelScore').value || '4.5';
+            const reviews = document.getElementById('hotelReviews').value || '0';
+            const cover1 = document.getElementById('hotelCover1').value || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200';
+            const cover2 = document.getElementById('hotelCover2').value || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=1200';
+            const desc = document.getElementById('hotelDesc').value || '酒店介绍内容';
+            const facilitiesRaw = document.getElementById('hotelFacilities').value;
+            const facilities = facilitiesRaw ? facilitiesRaw.split(',').filter(f => f.trim()) : [];
+
+            const preview = document.getElementById('previewArea');
+            
+            preview.innerHTML = `
+                <div class="max-w-md mx-auto bg-white min-h-full">
+                    <!-- 封面轮播图 -->
+                    <div class="carousel h-56 relative">
+                        <div class="carousel-inner h-full" id="previewCarouselInner">
+                            <div class="carousel-item h-full">
+                                <img src="${cover1}" alt="${name}" class="w-full h-full object-cover">
+                            </div>
+                            <div class="carousel-item h-full">
+                                <img src="${cover2}" alt="${name}" class="w-full h-full object-cover">
+                            </div>
+                        </div>
+                        <button class="carousel-btn prev" onclick="previewPrevSlide()">‹</button>
+                        <button class="carousel-btn next" onclick="previewNextSlide()">›</button>
+                        <div class="carousel-dots">
+                            <span class="carousel-dot active" id="previewDot0" onclick="previewGoToSlide(0)"></span>
+                            <span class="carousel-dot" id="previewDot1" onclick="previewGoToSlide(1)"></span>
+                        </div>
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                            <h1 class="text-white text-xl font-bold">${name}</h1>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="star text-sm">${getStarHtml(star)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 评分与地址 -->
+                    <div class="p-4 border-b">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="bg-orange-500 text-white text-sm font-bold px-2 py-0.5 rounded">${score}</span>
+                                    <span class="text-sm text-gray-600">${reviews}条点评</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">📍 ${address}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 酒店简介 -->
+                    <div class="p-4 border-b">
+                        <h3 class="font-semibold text-gray-800 mb-2">酒店介绍</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed">${desc}</p>
+                    </div>
+
+                    <!-- 酒店设施 -->
+                    <div class="p-4 border-b">
+                        <h3 class="font-semibold text-gray-800 mb-3">酒店设施</h3>
+                        <div class="flex flex-wrap gap-2">
+                            ${facilities.length > 0 ? facilities.map(f => `<span class="tag">${f.trim()}</span>`).join('') : '<span class="text-sm text-gray-400">暂无设施信息</span>'}
+                        </div>
+                    </div>
+
+                    <!-- 房型列表 -->
+                    <div class="p-4">
+                        <h3 class="font-semibold text-gray-800 mb-3">选择房型</h3>
+                        <div class="space-y-4">
+                            ${rooms.length > 0 ? rooms.map(room => renderRoomCard(room)).join('') : '<p class="text-sm text-gray-400 text-center py-8">暂无房型</p>'}
+                        </div>
+                    </div>
+
+                    <!-- 底部占位 -->
+                    <div class="h-20"></div>
+                </div>
+            `;
+        }
+
+        // 预览轮播控制
+        function previewPrevSlide() {
+            currentSlide = currentSlide === 0 ? 1 : 0;
+            updateCarouselUI('preview');
+        }
+
+        function previewNextSlide() {
+            currentSlide = currentSlide === 1 ? 0 : 1;
+            updateCarouselUI('preview');
+        }
+
+        function previewGoToSlide(index) {
+            currentSlide = index;
+            updateCarouselUI('preview');
+        }
+
+        function updateCarouselUI(prefix) {
+            const inner = document.getElementById(prefix + 'CarouselInner');
+            if (inner) {
+                inner.style.transform = `translateX(-${currentSlide * 100}%)`;
+            }
+            for (let i = 0; i < 2; i++) {
+                const dot = document.getElementById(prefix + 'Dot' + i);
+                if (dot) {
+                    dot.classList.toggle('active', i === currentSlide);
+                }
+            }
+        }
+
+        function renderRoomCard(room) {
+            const facilities = Array.isArray(room.facilities) ? room.facilities : [];
+            const discount = getDiscount(room.originalPrice, room.price);
+            const hasDiscount = discount && discount < 10;
+            const roomName = room.name || '房型名称';
+            const roomSize = room.size || '床型/面积信息';
+            const roomImage = room.image || 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800';
+            const roomPrice = room.price || '--';
+
+            return `
+                <div class="border rounded-lg overflow-hidden room-card transition-all duration-200">
+                    <div class="flex">
+                        <div class="w-32 h-28 flex-shrink-0 relative">
+                            <img src="${roomImage}" alt="${roomName}" class="w-full h-full object-cover">
+                            ${hasDiscount ? `<span class="absolute top-1 left-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">${discount}折</span>` : ''}
+                        </div>
+                        <div class="flex-1 p-3 flex flex-col justify-between">
+                            <div>
+                                <h4 class="font-medium text-gray-800 text-sm">${roomName}</h4>
+                                <p class="text-xs text-gray-500 mt-1">${roomSize}</p>
+                            </div>
+                            <div class="flex items-end justify-between">
+                                <div class="flex flex-wrap gap-1">
+                                    ${facilities.slice(0, 3).map(f => `<span class="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">${f.trim()}</span>`).join('')}
+                                </div>
+                                <div class="text-right">
+                                    ${hasDiscount ? `<div class="original-price">¥${room.originalPrice}</div>` : ''}
+                                    <span class="text-orange-500 font-bold text-lg">¥${roomPrice}</span>
+                                    <span class="text-xs text-gray-400">起</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 py-2 bg-gray-50 border-t flex justify-between items-center">
+                        <span class="text-xs text-green-600">✓ 含早餐 · 免费取消</span>
+                        <button class="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition">预订</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function exportGuestPage() {
+            // 获取当前数据
+            const name = document.getElementById('hotelName').value || '酒店名称';
+            const star = parseInt(document.getElementById('hotelStar').value);
+            const address = document.getElementById('hotelAddress').value || '酒店地址';
+            const score = document.getElementById('hotelScore').value || '4.5';
+            const reviews = document.getElementById('hotelReviews').value || '0';
+            const cover1 = document.getElementById('hotelCover1').value || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200';
+            const cover2 = document.getElementById('hotelCover2').value || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=1200';
+            const desc = document.getElementById('hotelDesc').value || '酒店介绍内容';
+            const facilitiesRaw = document.getElementById('hotelFacilities').value;
+            const facilities = facilitiesRaw ? facilitiesRaw.split(',').filter(f => f.trim()) : [];
+
+            // 生成完整的客人端HTML
+            const guestHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${name} - 在线预订</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>
+        .star { color: #f59e0b; }
+        .room-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .room-card { transition: all 0.2s; }
+        .book-btn { transition: background-color 0.2s; }
+        .book-btn:hover { background-color: #ea580c; }
+        .original-price { text-decoration: line-through; color: #9ca3af; font-size: 0.875rem; }
+        
+        /* 轮播图样式 */
+        .carousel { position: relative; overflow: hidden; }
+        .carousel-inner { display: flex; transition: transform 0.5s ease-in-out; }
+        .carousel-item { min-width: 100%; }
+        .carousel-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(0,0,0,0.4); color: white; border: none;
+            width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; z-index: 10;
+        }
+        .carousel-btn:hover { background: rgba(0,0,0,0.6); }
+        .carousel-btn.prev { left: 10px; }
+        .carousel-btn.next { right: 10px; }
+        .carousel-dots {
+            position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 6px; z-index: 10;
+        }
+        .carousel-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.3s;
+        }
+        .carousel-dot.active { background: white; width: 20px; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg">
+        <!-- 封面轮播图 -->
+        <div class="carousel h-64 relative">
+            <div class="carousel-inner h-full" id="carouselInner">
+                <div class="carousel-item h-full">
+                    <img src="${cover1}" alt="${name}" class="w-full h-full object-cover">
+                </div>
+                <div class="carousel-item h-full">
+                    <img src="${cover2}" alt="${name}" class="w-full h-full object-cover">
+                </div>
+            </div>
+            <button class="carousel-btn prev" onclick="prevSlide()">‹</button>
+            <button class="carousel-btn next" onclick="nextSlide()">›</button>
+            <div class="carousel-dots">
+                <span class="carousel-dot active" id="dot0" onclick="goToSlide(0)"></span>
+                <span class="carousel-dot" id="dot1" onclick="goToSlide(1)"></span>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-5">
+                <h1 class="text-white text-2xl font-bold">${name}</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="star">${getStarHtml(star)}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 评分与地址 -->
+        <div class="p-4 border-b">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="bg-orange-500 text-white text-base font-bold px-2.5 py-1 rounded">${score}分</span>
+                        <span class="text-sm text-gray-600">${reviews}条真实点评</span>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2">📍 ${address}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 酒店简介 -->
+        <div class="p-4 border-b">
+            <h3 class="font-semibold text-gray-800 mb-2 text-base">酒店介绍</h3>
+            <p class="text-sm text-gray-600 leading-relaxed">${desc}</p>
+        </div>
+
+        <!-- 酒店设施 -->
+        <div class="p-4 border-b">
+            <h3 class="font-semibold text-gray-800 mb-3 text-base">酒店设施</h3>
+            <div class="flex flex-wrap gap-2">
+                ${facilities.length > 0 ? facilities.map(f => `<span class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">${f.trim()}</span>`).join('') : '<span class="text-sm text-gray-400">暂无设施信息</span>'}
+            </div>
+        </div>
+
+        <!-- 房型列表 -->
+        <div class="p-4 pb-24">
+            <h3 class="font-semibold text-gray-800 mb-4 text-base">选择房型</h3>
+            <div class="space-y-4">
+                ${rooms.length > 0 ? rooms.map(room => renderRoomCardExport(room)).join('') : '<p class="text-sm text-gray-400 text-center py-8">暂无房型信息</p>'}
+            </div>
+        </div>
+
+        <!-- 底部预订栏 -->
+        <div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t shadow-lg p-3 flex items-center justify-between">
+            <div>
+                <span class="text-gray-500 text-sm">最低价格</span>
+                <div class="flex items-baseline gap-2">
+                    ${rooms.some(r => r.originalPrice > r.price) ? `<span class="original-price">¥${Math.min(...rooms.map(r => r.originalPrice || 9999))}</span>` : ''}
+                    <span class="text-orange-500 font-bold text-xl">¥${rooms.length > 0 ? Math.min(...rooms.map(r => r.price || 9999)) : '--'}</span>
+                    <span class="text-xs text-gray-400">起/晚</span>
+                </div>
+            </div>
+            <button class="book-btn px-8 py-3 bg-orange-500 text-white rounded-lg font-medium">
+                立即预订
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        
+        function prevSlide() {
+            currentSlide = currentSlide === 0 ? 1 : 0;
+            updateCarousel();
+        }
+        
+        function nextSlide() {
+            currentSlide = currentSlide === 1 ? 0 : 1;
+            updateCarousel();
+        }
+        
+        function goToSlide(index) {
+            currentSlide = index;
+            updateCarousel();
+        }
+        
+        function updateCarousel() {
+            const inner = document.getElementById('carouselInner');
+            inner.style.transform = 'translateX(-' + (currentSlide * 100) + '%)';
+            for (let i = 0; i < 2; i++) {
+                document.getElementById('dot' + i).classList.toggle('active', i === currentSlide);
+            }
+        }
+        
+        // 自动轮播
+        setInterval(nextSlide, 4000);
+    <\/script>
+</body>
+</html>`;
+
+            // 创建下载
+            const blob = new Blob([guestHtml], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${name || '酒店预订页面'}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function renderRoomCardExport(room) {
+            const facilities = Array.isArray(room.facilities) ? room.facilities : [];
+            const discount = getDiscount(room.originalPrice, room.price);
+            const hasDiscount = discount && discount < 10;
+            const roomName = room.name || '房型名称';
+            const roomSize = room.size || '床型/面积信息';
+            const roomImage = room.image || 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800';
+            const roomPrice = room.price || '--';
+
+            return `
+                <div class="border rounded-xl overflow-hidden room-card">
+                    <div class="flex">
+                        <div class="w-36 h-32 flex-shrink-0 relative">
+                            <img src="${roomImage}" alt="${roomName}" class="w-full h-full object-cover">
+                            ${hasDiscount ? `<span class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded font-bold">${discount}折特惠</span>` : ''}
+                        </div>
+                        <div class="flex-1 p-3 flex flex-col justify-between">
+                            <div>
+                                <h4 class="font-medium text-gray-800">${roomName}</h4>
+                                <p class="text-xs text-gray-500 mt-1">${roomSize}</p>
+                            </div>
+                            <div class="flex items-end justify-between">
+                                <div class="flex flex-wrap gap-1">
+                                    ${facilities.slice(0, 3).map(f => `<span class="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">${f.trim()}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 py-2.5 bg-gray-50 border-t flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-green-600">✓ 含双早</span>
+                            <span class="text-xs text-green-600">✓ 免费取消</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="text-right">
+                                ${hasDiscount ? `<div class="original-price">¥${room.originalPrice}</div>` : ''}
+                                <span class="text-orange-500 font-bold text-lg">¥${roomPrice}</span>
+                                <span class="text-xs text-gray-400">/晚</span>
+                            </div>
+                            <button class="book-btn px-4 py-1.5 bg-orange-500 text-white text-sm rounded-md">预订</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function resetAll() {
+            if (confirm('确定要重置所有内容吗？')) {
+                document.getElementById('hotelName').value = '';
+                document.getElementById('hotelStar').value = '5';
+                document.getElementById('hotelAddress').value = '';
+                document.getElementById('hotelScore').value = '';
+                document.getElementById('hotelReviews').value = '';
+                document.getElementById('hotelCover1').value = '';
+                document.getElementById('hotelCover2').value = '';
+                document.getElementById('hotelDesc').value = '';
+                document.getElementById('hotelFacilities').value = '';
+                rooms = [];
+                roomIdCounter = 0;
+                addRoom();
+                updatePreview();
+            }
+        }
+    </script>
+</body>
+</html>
